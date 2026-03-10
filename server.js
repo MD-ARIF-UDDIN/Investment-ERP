@@ -15,7 +15,7 @@ const app = express();
 
 // Middleware
 app.use(cors({
-    origin: ['http://localhost:5173', 'https://robiul-vai.vercel.app', 'https://investment-erp.onrender.com'],
+    origin: ['http://localhost:5173', 'https://robiul-vai.vercel.app', 'https://investment-erp.onrender.com', 'https://erp-i.vercel.app'],
     credentials: true
 }));
 app.use(express.json());
