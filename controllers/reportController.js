@@ -385,9 +385,9 @@ const getMonthlyReport = async (req, res) => {
             .sort()
             .map(k => {
                 const r = monthMap[k];
-                const totalIncome = r.memberDeposit + r.projectIncome;
-                const totalOutflow = r.memberWithdrawal + r.projectInvestment + r.expense;
-                return { ...r, totalIncome, totalOutflow, net: totalIncome - totalOutflow };
+                const profit = r.projectIncome - r.projectInvestment;
+                const totalOutflow = r.memberWithdrawal + r.expense;
+                return { ...r, profit, totalOutflow, net: r.memberDeposit + profit - totalOutflow };
             });
 
         // Grand totals
@@ -397,10 +397,10 @@ const getMonthlyReport = async (req, res) => {
             memberWithdrawal: acc.memberWithdrawal + r.memberWithdrawal,
             projectInvestment: acc.projectInvestment + r.projectInvestment,
             expense: acc.expense + r.expense,
-            totalIncome: acc.totalIncome + r.totalIncome,
+            profit: acc.profit + r.profit,
             totalOutflow: acc.totalOutflow + r.totalOutflow,
             net: acc.net + r.net
-        }), { memberDeposit: 0, projectIncome: 0, memberWithdrawal: 0, projectInvestment: 0, expense: 0, totalIncome: 0, totalOutflow: 0, net: 0 });
+        }), { memberDeposit: 0, projectIncome: 0, memberWithdrawal: 0, projectInvestment: 0, expense: 0, profit: 0, totalOutflow: 0, net: 0 });
 
         res.json({ rows, totals, dailyBreakdown });
     } catch (error) {

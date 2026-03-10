@@ -27,4 +27,16 @@ const getLogs = async (req, res) => {
     }
 };
 
-module.exports = { getLogs };
+// @desc    Clear all audit logs
+// @route   DELETE /api/logs
+// @access  Private/Admin
+const clearLogs = async (req, res) => {
+    try {
+        await Log.deleteMany({});
+        res.json({ message: 'All audit logs have been cleared successfully.' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { getLogs, clearLogs };
