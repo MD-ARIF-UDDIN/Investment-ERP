@@ -14,7 +14,10 @@ connectDB().then(() => {
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: ['http://localhost:5173', 'https://robiul-vai.vercel.app', 'https://investment-erp.onrender.com'],
+    credentials: true
+}));
 app.use(express.json());
 app.use(morgan('dev'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
