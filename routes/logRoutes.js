@@ -4,6 +4,6 @@ const { getLogs } = require('../controllers/logController');
 const { protect, admin } = require('../middleware/auth');
 
 router.route('/')
-    .get(protect, admin, getLogs);
+    .get(protect, getLogs);
 
 module.exports = router;

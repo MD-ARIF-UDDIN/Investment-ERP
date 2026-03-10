@@ -4,12 +4,12 @@ const { getFinancialSummary, getProfitReport, getProjectwiseReport } = require('
 const { protect, admin } = require('../middleware/auth');
 
 router.route('/summary')
-    .get(protect, admin, getFinancialSummary);
+    .get(protect, getFinancialSummary);
 
 router.route('/profit')
-    .get(protect, admin, getProfitReport);
+    .get(protect, getProfitReport);
 
 router.route('/projects')
-    .get(protect, admin, getProjectwiseReport);
+    .get(protect, getProjectwiseReport);
 
 module.exports = router;

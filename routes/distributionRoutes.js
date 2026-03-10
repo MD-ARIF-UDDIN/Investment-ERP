@@ -4,7 +4,7 @@ const { getDistributions, createDistribution } = require('../controllers/distrib
 const { protect, admin } = require('../middleware/auth.js');
 
 router.route('/')
-    .get(protect, admin, getDistributions)
+    .get(protect, getDistributions)
     .post(protect, admin, createDistribution);
 
 module.exports = router;

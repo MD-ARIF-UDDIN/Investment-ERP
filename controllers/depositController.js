@@ -7,7 +7,7 @@ const Log = require('../models/Log');
 // @access  Private
 const getDeposits = async (req, res) => {
     try {
-        const { depositFor, member, month, year } = req.query;
+        const { depositFor, member, project, month, year } = req.query;
         let query = {};
 
         if (depositFor) {
@@ -16,6 +16,10 @@ const getDeposits = async (req, res) => {
 
         if (member) {
             query.member = member;
+        }
+
+        if (project) {
+            query.project = project;
         }
 
         if (month && year) {
