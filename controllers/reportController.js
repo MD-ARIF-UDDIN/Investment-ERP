@@ -161,8 +161,10 @@ const getProfitReport = async (req, res) => {
         // Aggregate deposits by member for this range
         const memberRangeDeposits = {};
         deposits.forEach(d => {
-            const memberId = d.member.toString();
-            memberRangeDeposits[memberId] = (memberRangeDeposits[memberId] || 0) + d.amount;
+            if (d.depositFor === 'Member' && d.member) {
+                const memberId = d.member.toString();
+                memberRangeDeposits[memberId] = (memberRangeDeposits[memberId] || 0) + d.amount;
+            }
         });
 
         let totalRevenue = 0;
