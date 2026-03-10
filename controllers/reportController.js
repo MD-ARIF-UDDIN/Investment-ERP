@@ -281,4 +281,132 @@ const getProjectwiseReport = async (req, res) => {
     }
 };
 
-module.exports = { getFinancialSummary, getProfitReport, getProjectwiseReport };
+// @desc    Monthly financial report — all months or a single month drill-down
+// @route   GET /api/reports/monthly?mode=all | ?mode=single&month=X&year=Y
+// @access  Private
+const getMonthlyReport = async (req, res) => {
+    try {
+        const { mode, month, year } = req.query;
+
+        let matchFilter = {};
+        if (mode === 'single' && month && year) {
+            const start = new Date(Number(year), Number(month) - 1, 1);
+            const end   = new Date(Number(year), Number(month), 0, 23, 59, 59, 999);
+            matchFilter = { date: { $gte: start, $lte: end } };
+        }
+
+        const groupStage = {
+            $group: {
+                _id: { year: { $year: '$date' }, month: { $month: '$date' } },
+                total: { $sum: '$amount' }
+            }
+        };
+
+        // Member deposits
+        const memberDepositPipeline = [
+            { $match: { depositFor: 'Member', ...matchFilter } },
+            groupStage,
+            { $sort: { '_id.year': 1, '_id.month': 1 } }
+        ];
+
+        // Project income (deposits for project)
+        const projectIncomePipeline = [
+            { $match: { depositFor: 'Project', ...matchFilter } },
+            groupStage,
+            { $sort: { '_id.year': 1, '_id.month': 1 } }
+        ];
+
+        // All withdrawals (member withdrawals)
+        const withdrawalPipeline = [
+            { $match: { type: 'Member', ...matchFilter } },
+            groupStage,
+            { $sort: { '_id.year': 1, '_id.month': 1 } }
+        ];
+
+        // Project investments (type: 'Project Investment')
+        const projectInvestPipeline = [
+            { $match: { type: 'Project Investment', ...matchFilter } },
+            groupStage,
+            { $sort: { '_id.year': 1, '_id.month': 1 } }
+        ];
+
+        // Expenses
+        const expensePipeline = [
+            { $match: { ...matchFilter } },
+            groupStage,
+            { $sort: { '_id.year': 1, '_id.month': 1 } }
+        ];
+
+        const [memberDeposits, projectIncome, memberWithdrawals, projectInvestments, expenses] = await Promise.all([
+            Deposit.aggregate(memberDepositPipeline),
+            Deposit.aggregate(projectIncomePipeline),
+            Withdrawal.aggregate(withdrawalPipeline),
+            Withdrawal.aggregate(projectInvestPipeline),
+            Expense.aggregate(expensePipeline)
+        ]);
+
+        // If single month — also return day-level breakdown
+        let dailyBreakdown = [];
+        if (mode === 'single' && month && year) {
+            const start = new Date(Number(year), Number(month) - 1, 1);
+            const end   = new Date(Number(year), Number(month), 0, 23, 59, 59, 999);
+            const dayGroup = {
+                $group: {
+                    _id: { year: { $year: '$date' }, month: { $month: '$date' }, day: { $dayOfMonth: '$date' } },
+                    total: { $sum: '$amount' },
+                    type: { $first: '$type' }
+                }
+            };
+            const [dayDeposits, dayWithdrawals, dayExpenses] = await Promise.all([
+                Deposit.aggregate([{ $match: { depositFor: 'Member', date: { $gte: start, $lte: end } } }, dayGroup, { $sort: { '_id.day': 1 } }]),
+                Withdrawal.aggregate([{ $match: { type: 'Member', date: { $gte: start, $lte: end } } }, dayGroup, { $sort: { '_id.day': 1 } }]),
+                Expense.aggregate([{ $match: { date: { $gte: start, $lte: end } } }, dayGroup, { $sort: { '_id.day': 1 } }])
+            ]);
+            dailyBreakdown = { dayDeposits, dayWithdrawals, dayExpenses };
+        }
+
+        // Merge all results into a unified month list
+        const monthMap = {};
+        const key = (y, m) => `${y}-${String(m).padStart(2, '0')}`;
+
+        const ensure = (y, m) => {
+            const k = key(y, m);
+            if (!monthMap[k]) monthMap[k] = { year: y, month: m, memberDeposit: 0, projectIncome: 0, memberWithdrawal: 0, projectInvestment: 0, expense: 0 };
+            return monthMap[k];
+        };
+
+        memberDeposits.forEach(r => { ensure(r._id.year, r._id.month).memberDeposit = r.total; });
+        projectIncome.forEach(r => { ensure(r._id.year, r._id.month).projectIncome = r.total; });
+        memberWithdrawals.forEach(r => { ensure(r._id.year, r._id.month).memberWithdrawal = r.total; });
+        projectInvestments.forEach(r => { ensure(r._id.year, r._id.month).projectInvestment = r.total; });
+        expenses.forEach(r => { ensure(r._id.year, r._id.month).expense = r.total; });
+
+        const rows = Object.keys(monthMap)
+            .sort()
+            .map(k => {
+                const r = monthMap[k];
+                const totalIncome = r.memberDeposit + r.projectIncome;
+                const totalOutflow = r.memberWithdrawal + r.projectInvestment + r.expense;
+                return { ...r, totalIncome, totalOutflow, net: totalIncome - totalOutflow };
+            });
+
+        // Grand totals
+        const totals = rows.reduce((acc, r) => ({
+            memberDeposit: acc.memberDeposit + r.memberDeposit,
+            projectIncome: acc.projectIncome + r.projectIncome,
+            memberWithdrawal: acc.memberWithdrawal + r.memberWithdrawal,
+            projectInvestment: acc.projectInvestment + r.projectInvestment,
+            expense: acc.expense + r.expense,
+            totalIncome: acc.totalIncome + r.totalIncome,
+            totalOutflow: acc.totalOutflow + r.totalOutflow,
+            net: acc.net + r.net
+        }), { memberDeposit: 0, projectIncome: 0, memberWithdrawal: 0, projectInvestment: 0, expense: 0, totalIncome: 0, totalOutflow: 0, net: 0 });
+
+        res.json({ rows, totals, dailyBreakdown });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { getFinancialSummary, getProfitReport, getProjectwiseReport, getMonthlyReport };

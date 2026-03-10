@@ -1,4 +1,5 @@
 const Member = require('../models/Member');
+const User = require('../models/User');
 const Log = require('../models/Log');
 
 // @desc    Get all members
@@ -8,7 +9,8 @@ const getMembers = async (req, res) => {
     try {
         const members = await Member.find({})
             .populate('createdBy', 'name')
-            .populate('updatedBy', 'name');
+            .populate('updatedBy', 'name')
+            .populate('userRef', 'name email');
         res.json(members);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -19,7 +21,7 @@ const getMembers = async (req, res) => {
 // @route   POST /api/members
 // @access  Private/Admin
 const createMember = async (req, res) => {
-    const { name, memberId, phone, address, nid } = req.body;
+    const { name, memberId, phone, email, dateOfBirth, gender, bloodGroup, occupation, address, nid, joinDate, nomineeName, nomineePhone, nomineeRelation, nomineeNid } = req.body;
     let photo = '';
     let nidPhoto = '';
 
@@ -34,16 +36,47 @@ const createMember = async (req, res) => {
             return res.status(400).json({ message: 'সদস্য আইডি ইতিমধ্যে বিদ্যমান' });
         }
 
+        // Create the member
         const member = await Member.create({
             name,
             memberId,
             phone,
+            email,
+            dateOfBirth,
+            gender,
+            bloodGroup,
+            occupation,
             address,
             nid,
+            joinDate,
+            nomineeName,
+            nomineePhone,
+            nomineeRelation,
+            nomineeNid,
             photo,
             nidPhoto,
             createdBy: req.user._id
         });
+
+        // Auto-create a system User account for this member
+        // Email: memberId@member.local  |  Password: provided by admin (falls back to memberId)
+        const email = `${memberId.toLowerCase()}@member.local`;
+        const existingUser = await User.findOne({ email });
+
+        if (!existingUser) {
+            const newUser = await User.create({
+                name,
+                email,
+                password: req.body.password || memberId,  // use provided password or memberId as fallback
+                role: 'Member',
+                memberId: member._id,        // links User → Member
+                createdBy: req.user._id
+            });
+
+            // Link member → user
+            member.userRef = newUser._id;
+            await member.save();
+        }
 
         await Log.create({
             action: 'CREATE_MEMBER',
@@ -68,8 +101,18 @@ const updateMember = async (req, res) => {
         if (member) {
             member.name = req.body.name || member.name;
             member.phone = req.body.phone || member.phone;
+            member.email = req.body.email !== undefined ? req.body.email : member.email;
+            member.dateOfBirth = req.body.dateOfBirth || member.dateOfBirth;
+            member.gender = req.body.gender !== undefined ? req.body.gender : member.gender;
+            member.bloodGroup = req.body.bloodGroup !== undefined ? req.body.bloodGroup : member.bloodGroup;
+            member.occupation = req.body.occupation !== undefined ? req.body.occupation : member.occupation;
             member.address = req.body.address || member.address;
             member.nid = req.body.nid || member.nid;
+            member.joinDate = req.body.joinDate || member.joinDate;
+            member.nomineeName = req.body.nomineeName !== undefined ? req.body.nomineeName : member.nomineeName;
+            member.nomineePhone = req.body.nomineePhone !== undefined ? req.body.nomineePhone : member.nomineePhone;
+            member.nomineeRelation = req.body.nomineeRelation !== undefined ? req.body.nomineeRelation : member.nomineeRelation;
+            member.nomineeNid = req.body.nomineeNid !== undefined ? req.body.nomineeNid : member.nomineeNid;
             member.status = req.body.status || member.status;
 
             if (req.files) {
@@ -79,6 +122,14 @@ const updateMember = async (req, res) => {
             member.updatedBy = req.user._id;
 
             const updatedMember = await member.save();
+
+            // Keep the linked user's name in sync
+            if (updatedMember.userRef && req.body.name) {
+                await User.findByIdAndUpdate(updatedMember.userRef, {
+                    name: req.body.name,
+                    updatedBy: req.user._id
+                });
+            }
 
             await Log.create({
                 action: 'UPDATE_MEMBER',
@@ -90,7 +141,7 @@ const updateMember = async (req, res) => {
 
             res.json(updatedMember);
         } else {
-            res.status(404).json({ message: 'সদস্য পাওয়া যায়নি' });
+            res.status(404).json({ message: 'সদস্য পাওয়া যায়নি' });
         }
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -104,6 +155,11 @@ const deleteMember = async (req, res) => {
     try {
         const member = await Member.findById(req.params.id);
         if (member) {
+            // Also remove the linked system user
+            if (member.userRef) {
+                await User.findByIdAndDelete(member.userRef);
+            }
+
             await Log.create({
                 action: 'DELETE_MEMBER',
                 entityType: 'Member',
@@ -113,9 +169,9 @@ const deleteMember = async (req, res) => {
             });
 
             await member.deleteOne();
-            res.json({ message: 'সদস্য মুছে ফেলা হয়েছে' });
+            res.json({ message: 'সদস্য মুছে ফেলা হয়েছে' });
         } else {
-            res.status(404).json({ message: 'সদস্য পাওয়া যায়নি' });
+            res.status(404).json({ message: 'সদস্য পাওয়া যায়নি' });
         }
     } catch (error) {
         res.status(500).json({ message: error.message });

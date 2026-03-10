@@ -56,7 +56,7 @@ const getProjects = async (req, res) => {
 // @route   POST /api/projects
 // @access  Private/Admin
 const createProject = async (req, res) => {
-    const { name, totalInvestment, startDate, endDate } = req.body;
+    const { name, totalInvestment, startDate, endDate, description, location, projectType, expectedReturn, responsiblePerson, contactPhone } = req.body;
 
     let image = '';
     if (req.file) {
@@ -70,6 +70,12 @@ const createProject = async (req, res) => {
             totalInvestment: 0,
             startDate,
             endDate,
+            description,
+            location,
+            projectType: projectType || 'Other',
+            expectedReturn: expectedReturn ? Number(expectedReturn) : undefined,
+            responsiblePerson,
+            contactPhone,
             image,
             createdBy: req.user._id
         });
@@ -168,9 +174,15 @@ const updateProject = async (req, res) => {
         }
 
         project.name = req.body.name || project.name;
-        project.investedAmount = req.body.investedAmount || project.investedAmount;
         project.startDate = req.body.startDate || project.startDate;
+        project.endDate = req.body.endDate || project.endDate;
         project.status = req.body.status || project.status;
+        project.description = req.body.description !== undefined ? req.body.description : project.description;
+        project.location = req.body.location !== undefined ? req.body.location : project.location;
+        project.projectType = req.body.projectType || project.projectType;
+        project.expectedReturn = req.body.expectedReturn !== undefined ? Number(req.body.expectedReturn) : project.expectedReturn;
+        project.responsiblePerson = req.body.responsiblePerson !== undefined ? req.body.responsiblePerson : project.responsiblePerson;
+        project.contactPhone = req.body.contactPhone !== undefined ? req.body.contactPhone : project.contactPhone;
 
         if (req.file) {
             project.image = `/uploads/projects/${req.file.filename}`;

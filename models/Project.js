@@ -22,6 +22,26 @@ const projectSchema = new mongoose.Schema({
         enum: ['Running', 'Completed', 'Cancelled'],
         default: 'Running',
     },
+    description: {
+        type: String,
+    },
+    location: {
+        type: String,
+    },
+    projectType: {
+        type: String,
+        enum: ['Real Estate', 'Business', 'Agriculture', 'Technology', 'Trade', 'Other'],
+        default: 'Other',
+    },
+    expectedReturn: {
+        type: Number,
+    },
+    responsiblePerson: {
+        type: String,
+    },
+    contactPhone: {
+        type: String,
+    },
     image: {
         type: String,
     },

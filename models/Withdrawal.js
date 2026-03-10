@@ -4,12 +4,16 @@ const withdrawalSchema = new mongoose.Schema({
     member: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Member',
-        required: function () { return this.type !== 'Project Investment'; }
+        required: function () { return this.type === 'Normal' || this.type === 'Profit'; }
     },
     project: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Project',
         required: function () { return this.type === 'Project Investment'; }
+    },
+    expenseRef: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Expense',
     },
     amount: {
         type: Number,
@@ -21,7 +25,7 @@ const withdrawalSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['Normal', 'Profit', 'Project Investment'],
+        enum: ['Normal', 'Profit', 'Project Investment', 'Expense'],
         default: 'Normal',
     },
     reason: String,

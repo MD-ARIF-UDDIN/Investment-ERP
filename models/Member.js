@@ -14,8 +14,50 @@ const memberSchema = new mongoose.Schema({
         type: String,
         required: [true, 'ফোন নম্বর আবশ্যক'],
     },
+    email: {
+        type: String,
+        default: ''
+    },
+    dateOfBirth: {
+        type: Date,
+    },
+    gender: {
+        type: String,
+        enum: ['Male', 'Female', 'Other', ''],
+        default: ''
+    },
+    bloodGroup: {
+        type: String,
+        enum: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', ''],
+        default: ''
+    },
+    occupation: {
+        type: String,
+        default: ''
+    },
     address: String,
     nid: {
+        type: String,
+        default: ''
+    },
+    joinDate: {
+        type: Date,
+        default: Date.now
+    },
+    // Nominee Information
+    nomineeName: {
+        type: String,
+        default: ''
+    },
+    nomineePhone: {
+        type: String,
+        default: ''
+    },
+    nomineeRelation: {
+        type: String,
+        default: ''
+    },
+    nomineeNid: {
         type: String,
         default: ''
     },
@@ -53,6 +95,10 @@ const memberSchema = new mongoose.Schema({
         ref: 'User',
     },
     updatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    },
+    userRef: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
     }

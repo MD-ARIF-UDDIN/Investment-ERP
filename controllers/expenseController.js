@@ -1,4 +1,5 @@
 const Expense = require('../models/Expense');
+const Withdrawal = require('../models/Withdrawal');
 const Log = require('../models/Log');
 
 // @desc    Get all expenses
@@ -23,6 +24,7 @@ const createExpense = async (req, res) => {
     const receipt = req.file ? `/uploads/expenses/${req.file.filename}` : '';
 
     try {
+        // Create the expense first
         const expense = await Expense.create({
             title,
             amount,
@@ -32,6 +34,20 @@ const createExpense = async (req, res) => {
             receipt,
             createdBy: req.user._id
         });
+
+        // Auto-create a linked withdrawal of type 'Expense'
+        const withdrawal = await Withdrawal.create({
+            amount,
+            date,
+            reason: `${title} (খরচ)`,
+            type: 'Expense',
+            expenseRef: expense._id,
+            createdBy: req.user._id
+        });
+
+        // Link the withdrawal back to the expense
+        expense.withdrawalRef = withdrawal._id;
+        await expense.save();
 
         await Log.create({
             action: 'CREATE_EXPENSE',
@@ -54,7 +70,7 @@ const updateExpense = async (req, res) => {
     try {
         const expense = await Expense.findById(req.params.id);
         if (!expense) {
-            return res.status(404).json({ message: 'খরচ পাওয়া যায়নি' });
+            return res.status(404).json({ message: 'খরচ পাওয়া যায়নি' });
         }
 
         expense.title = req.body.title || expense.title;
@@ -68,6 +84,30 @@ const updateExpense = async (req, res) => {
         expense.updatedBy = req.user._id;
 
         const updatedExpense = await expense.save();
+
+        // Sync the linked withdrawal (if it exists)
+        if (updatedExpense.withdrawalRef) {
+            const withdrawal = await Withdrawal.findById(updatedExpense.withdrawalRef);
+            if (withdrawal) {
+                withdrawal.amount = updatedExpense.amount;
+                withdrawal.date = updatedExpense.date;
+                withdrawal.reason = `${updatedExpense.title} (খরচ)`;
+                withdrawal.updatedBy = req.user._id;
+                await withdrawal.save();
+            }
+        } else {
+            // If no withdrawal exists yet (e.g. legacy expense), create one now
+            const withdrawal = await Withdrawal.create({
+                amount: updatedExpense.amount,
+                date: updatedExpense.date,
+                reason: `${updatedExpense.title} (খরচ)`,
+                type: 'Expense',
+                expenseRef: updatedExpense._id,
+                createdBy: req.user._id
+            });
+            updatedExpense.withdrawalRef = withdrawal._id;
+            await updatedExpense.save();
+        }
 
         await Log.create({
             action: 'UPDATE_EXPENSE',
@@ -90,7 +130,12 @@ const deleteExpense = async (req, res) => {
     try {
         const expense = await Expense.findById(req.params.id);
         if (!expense) {
-            return res.status(404).json({ message: 'খরচ পাওয়া যায়নি' });
+            return res.status(404).json({ message: 'খরচ পাওয়া যায়নি' });
+        }
+
+        // Delete the linked withdrawal first
+        if (expense.withdrawalRef) {
+            await Withdrawal.findByIdAndDelete(expense.withdrawalRef);
         }
 
         await Log.create({
@@ -102,7 +147,7 @@ const deleteExpense = async (req, res) => {
         });
 
         await expense.deleteOne();
-        res.json({ message: 'খরচ মুছে ফেলা হয়েছে' });
+        res.json({ message: 'খরচ মুছে ফেলা হয়েছে' });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

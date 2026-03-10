@@ -29,6 +29,10 @@ const expenseSchema = new mongoose.Schema({
     updatedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
+    },
+    withdrawalRef: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Withdrawal',
     }
 }, {
     timestamps: true,
