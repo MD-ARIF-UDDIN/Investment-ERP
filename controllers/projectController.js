@@ -22,6 +22,9 @@ const getProjects = async (req, res) => {
             const relatedDeposits = projectDeposits.filter(d => d.project?.toString() === p._id.toString());
             const relatedInvestments = investmentWithdrawals.filter(w => w.project?.toString() === p._id.toString());
 
+            // NEW: Dynamically calculate total investment from withdrawals
+            const totalInvested = relatedInvestments.reduce((sum, inv) => sum + inv.amount, 0);
+            
             // Format deposits to match legacy paymentsReceived structure
             const formattedDeposits = relatedDeposits.map(d => ({
                 _id: d._id,
@@ -31,25 +34,21 @@ const getProjects = async (req, res) => {
                 type: d.type
             }));
 
-            // Format investment withdrawals for display
-            const formattedInvestments = relatedInvestments.map(w => ({
-                _id: w._id,
-                amount: w.amount,
-                date: w.date,
-                note: w.reason
-            }));
+            // NEW: Dynamically calculate total received from legacy + new deposits
+            const legacyReceived = p.paymentsReceived?.reduce((acc, curr) => acc + curr.amount, 0) || 0;
+            const depositReceived = relatedDeposits.reduce((acc, d) => acc + d.amount, 0);
+            const totalReceived = legacyReceived + depositReceived;
 
-            // Calculate Due Amount based on return logic
+            // NEW: Calculate Due Amount based on return logic
             const now = new Date();
             const start = new Date(p.startDate);
             let monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()) + 1;
             monthsPassed = Math.max(0, Math.min(monthsPassed, p.returnMonths || 1));
 
-            const totalReceived = p.paymentsReceived?.reduce((acc, curr) => acc + curr.amount, 0) || 0;
-            const fullCapitalPaid = totalReceived >= p.totalInvestment;
+            const fullCapitalPaid = totalReceived >= totalInvested;
             const wasCapitalPaidEarly = fullCapitalPaid && monthsPassed <= 2;
 
-            const totalProfitExpected = (p.totalInvestment * (p.returnPercentage || 0)) / 100;
+            const totalProfitExpected = (totalInvested * (p.returnPercentage || 0)) / 100;
             const monthlyRate = totalProfitExpected / (p.returnMonths || 1);
 
             let expectedToDate = 0;
@@ -59,11 +58,21 @@ const getProjects = async (req, res) => {
                 expectedToDate = monthsPassed * monthlyRate;
             }
 
-            const profitPaid = Math.max(0, totalReceived - p.totalInvestment);
+            const profitPaid = Math.max(0, totalReceived - totalInvested);
             const dueAmount = Math.max(0, Math.round(expectedToDate - profitPaid));
+
+            // Format investment history
+            const formattedInvestments = relatedInvestments.map(w => ({
+                _id: w._id,
+                amount: w.amount,
+                date: w.date,
+                note: w.reason
+            }));
 
             return {
                 ...p,
+                totalInvestment: totalInvested > 0 ? totalInvested : p.totalInvestment, // Fallback to field if no withdrawals
+                currentProfit: totalReceived - totalInvested, // Dynamic profit
                 paymentsReceived: [...(p.paymentsReceived || []), ...formattedDeposits],
                 investmentHistory: formattedInvestments,
                 dueAmount
