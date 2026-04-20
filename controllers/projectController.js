@@ -56,7 +56,7 @@ const getProjects = async (req, res) => {
 // @route   POST /api/projects
 // @access  Private/Admin
 const createProject = async (req, res) => {
-    const { name, totalInvestment, startDate, endDate, description, location, projectType, expectedReturn, responsiblePerson, contactPhone } = req.body;
+    const { name, totalInvestment, startDate, endDate, description, location, projectType, expectedReturn, responsiblePerson, contactPhone, returnPercentage, returnMonths } = req.body;
 
     let image = '';
     if (req.file) {
@@ -76,6 +76,8 @@ const createProject = async (req, res) => {
             expectedReturn: expectedReturn ? Number(expectedReturn) : undefined,
             responsiblePerson,
             contactPhone,
+            returnPercentage: returnPercentage ? Number(returnPercentage) : 0,
+            returnMonths: returnMonths ? Number(returnMonths) : 1,
             image,
             createdBy: req.user._id
         });
@@ -183,6 +185,8 @@ const updateProject = async (req, res) => {
         project.expectedReturn = req.body.expectedReturn !== undefined ? Number(req.body.expectedReturn) : project.expectedReturn;
         project.responsiblePerson = req.body.responsiblePerson !== undefined ? req.body.responsiblePerson : project.responsiblePerson;
         project.contactPhone = req.body.contactPhone !== undefined ? req.body.contactPhone : project.contactPhone;
+        project.returnPercentage = req.body.returnPercentage !== undefined ? Number(req.body.returnPercentage) : project.returnPercentage;
+        project.returnMonths = req.body.returnMonths !== undefined ? Number(req.body.returnMonths) : project.returnMonths;
 
         if (req.file) {
             project.image = `/uploads/projects/${req.file.filename}`;

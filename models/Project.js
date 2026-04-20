@@ -42,6 +42,14 @@ const projectSchema = new mongoose.Schema({
     contactPhone: {
         type: String,
     },
+    returnPercentage: {
+        type: Number,
+        default: 0,
+    },
+    returnMonths: {
+        type: Number,
+        default: 1,
+    },
     image: {
         type: String,
     },

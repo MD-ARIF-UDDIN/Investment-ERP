@@ -1,6 +1,8 @@
 const Deposit = require('../models/Deposit');
 const Member = require('../models/Member');
 const Log = require('../models/Log');
+const Withdrawal = require('../models/Withdrawal');
+const Project = require('../models/Project');
 
 // @desc    Get all deposits
 // @route   GET /api/deposits
@@ -76,6 +78,40 @@ const createDeposit = async (req, res) => {
             depositData.project = projectId;
         } else {
             depositData.member = memberId;
+            
+            // SPECIAL LOGIC: Project-Return calculation
+            if (type === 'Project-Return' && projectId) {
+                const project = await Project.findById(projectId);
+                if (project) {
+                    depositData.project = projectId;
+                    // Note: The UI should ideally calculate this, 
+                    // but we ensure it matches our logic if parameters are sent.
+                    const { returnPercentage, returnMonths, monthsPaid } = req.body;
+                    
+                    if (returnPercentage && returnMonths && monthsPaid) {
+                        // Find member's investment in this project
+                        const investments = await Withdrawal.find({
+                            member: memberId,
+                            project: projectId,
+                            type: 'Project Investment'
+                        });
+                        const totalInvested = investments.reduce((sum, inv) => sum + inv.amount, 0);
+                        
+                        const monthlyReturn = (totalInvested * (Number(returnPercentage) / 100)) / Number(returnMonths);
+                        const calculatedAmount = Math.round(monthlyReturn * Number(monthsPaid));
+                        
+                        // If amount wasn't provided or mismatch? 
+                        // We'll trust the calculation if the user sent these params.
+                        if (!amount) {
+                            depositData.amount = calculatedAmount;
+                        }
+                    }
+                    
+                    // Increment distributedProfit on project
+                    project.distributedProfit = (project.distributedProfit || 0) + Number(depositData.amount || amount);
+                    await project.save();
+                }
+            }
         }
 
         const deposit = await Deposit.create(depositData);

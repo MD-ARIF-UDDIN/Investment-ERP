@@ -34,6 +34,7 @@ const createWithdrawal = async (req, res) => {
             if (!project) return res.status(404).json({ message: 'প্রকল্প পাওয়া যায়নি' });
 
             const withdrawal = await Withdrawal.create({
+                member: memberId,
                 project: projectId,
                 amount,
                 date,
@@ -263,4 +264,22 @@ const deleteWithdrawal = async (req, res) => {
     }
 };
 
-module.exports = { getWithdrawals, createWithdrawal, updateWithdrawal, deleteWithdrawal };
+// @desc    Get member's investment in a project
+// @route   GET /api/withdrawals/member/:memberId/project/:projectId
+// @access  Private
+const getMemberProjectInvestment = async (req, res) => {
+    try {
+        const { memberId, projectId } = req.params;
+        const investments = await Withdrawal.find({
+            member: memberId,
+            project: projectId,
+            type: 'Project Investment'
+        });
+        const totalAmount = investments.reduce((sum, inv) => sum + inv.amount, 0);
+        res.json({ totalAmount });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { getWithdrawals, createWithdrawal, updateWithdrawal, deleteWithdrawal, getMemberProjectInvestment };
