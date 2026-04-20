@@ -75,46 +75,35 @@ const createDeposit = async (req, res) => {
         };
 
         if (depositFor === 'Project') {
-            depositData.project = projectId;
-        } else {
-            depositData.member = memberId;
-            
-            // SPECIAL LOGIC: Project-Return calculation
-            if (type === 'Project-Return' && projectId) {
-                const project = await Project.findById(projectId);
-                if (project) {
-                    depositData.project = projectId;
-                    
-                    // Always try to calculate based on available project terms and member's investment
+            const project = await Project.findById(projectId);
+            if (project) {
+                depositData.project = projectId;
+                
+                // NEW: Project Return calculation logic
+                if (type === 'Project-Return') {
                     const monthsPaid = Number(req.body.monthsPaid) || 1;
                     const returnPercentage = Number(req.body.returnPercentage) || project.returnPercentage || 0;
                     const returnMonths = Number(req.body.returnMonths) || project.returnMonths || 1;
                     
-                    if (returnPercentage > 0 && returnMonths > 0) {
-                        // Find member's investment in this project
-                        const investments = await Withdrawal.find({
-                            member: memberId,
-                            project: projectId,
-                            type: 'Project Investment'
-                        });
-                        const totalInvested = investments.reduce((sum, inv) => sum + inv.amount, 0);
+                    if (returnPercentage > 0 && returnMonths > 0 && project.totalInvestment > 0) {
+                        const monthlyReturn = (project.totalInvestment * (returnPercentage / 100)) / returnMonths;
+                        const calculatedAmount = Math.round(monthlyReturn * monthsPaid);
                         
-                        if (totalInvested > 0) {
-                            const monthlyReturn = (totalInvested * (returnPercentage / 100)) / returnMonths;
-                            const calculatedAmount = Math.round(monthlyReturn * monthsPaid);
-                            
-                            // If amount wasn't provided, use calculated value
-                            if (!amount) {
-                                depositData.amount = calculatedAmount;
-                            }
+                        if (!amount) {
+                            depositData.amount = calculatedAmount;
                         }
                     }
-                    
-                    // Increment distributedProfit on project
-                    project.distributedProfit = (project.distributedProfit || 0) + Number(depositData.amount || amount);
-                    await project.save();
                 }
+
+                // Recalculate profit if it's a standard income/profit deposit
+                const projectDeposits = await Deposit.find({ project: projectId, depositFor: 'Project' });
+                const totalReceived = projectDeposits.reduce((acc, d) => acc + d.amount, 0) + (depositData.amount || amount || 0);
+                const legacyReceived = project.paymentsReceived?.reduce((acc, p) => acc + p.amount, 0) || 0;
+                project.currentProfit = (totalReceived + legacyReceived) - project.totalInvestment;
+                await project.save();
             }
+        } else {
+            depositData.member = memberId;
         }
 
         const deposit = await Deposit.create(depositData);

@@ -39,10 +39,34 @@ const getProjects = async (req, res) => {
                 note: w.reason
             }));
 
+            // Calculate Due Amount based on return logic
+            const now = new Date();
+            const start = new Date(p.startDate);
+            let monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()) + 1;
+            monthsPassed = Math.max(0, Math.min(monthsPassed, p.returnMonths || 1));
+
+            const totalReceived = p.paymentsReceived?.reduce((acc, curr) => acc + curr.amount, 0) || 0;
+            const fullCapitalPaid = totalReceived >= p.totalInvestment;
+            const wasCapitalPaidEarly = fullCapitalPaid && monthsPassed <= 2;
+
+            const totalProfitExpected = (p.totalInvestment * (p.returnPercentage || 0)) / 100;
+            const monthlyRate = totalProfitExpected / (p.returnMonths || 1);
+
+            let expectedToDate = 0;
+            if (wasCapitalPaidEarly) {
+                expectedToDate = totalProfitExpected;
+            } else {
+                expectedToDate = monthsPassed * monthlyRate;
+            }
+
+            const profitPaid = Math.max(0, totalReceived - p.totalInvestment);
+            const dueAmount = Math.max(0, Math.round(expectedToDate - profitPaid));
+
             return {
                 ...p,
                 paymentsReceived: [...(p.paymentsReceived || []), ...formattedDeposits],
-                investmentHistory: formattedInvestments
+                investmentHistory: formattedInvestments,
+                dueAmount
             };
         });
 
