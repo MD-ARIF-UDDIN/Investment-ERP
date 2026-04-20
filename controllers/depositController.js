@@ -84,11 +84,13 @@ const createDeposit = async (req, res) => {
                 const project = await Project.findById(projectId);
                 if (project) {
                     depositData.project = projectId;
-                    // Note: The UI should ideally calculate this, 
-                    // but we ensure it matches our logic if parameters are sent.
-                    const { returnPercentage, returnMonths, monthsPaid } = req.body;
                     
-                    if (returnPercentage && returnMonths && monthsPaid) {
+                    // Always try to calculate based on available project terms and member's investment
+                    const monthsPaid = Number(req.body.monthsPaid) || 1;
+                    const returnPercentage = Number(req.body.returnPercentage) || project.returnPercentage || 0;
+                    const returnMonths = Number(req.body.returnMonths) || project.returnMonths || 1;
+                    
+                    if (returnPercentage > 0 && returnMonths > 0) {
                         // Find member's investment in this project
                         const investments = await Withdrawal.find({
                             member: memberId,
@@ -97,13 +99,14 @@ const createDeposit = async (req, res) => {
                         });
                         const totalInvested = investments.reduce((sum, inv) => sum + inv.amount, 0);
                         
-                        const monthlyReturn = (totalInvested * (Number(returnPercentage) / 100)) / Number(returnMonths);
-                        const calculatedAmount = Math.round(monthlyReturn * Number(monthsPaid));
-                        
-                        // If amount wasn't provided or mismatch? 
-                        // We'll trust the calculation if the user sent these params.
-                        if (!amount) {
-                            depositData.amount = calculatedAmount;
+                        if (totalInvested > 0) {
+                            const monthlyReturn = (totalInvested * (returnPercentage / 100)) / returnMonths;
+                            const calculatedAmount = Math.round(monthlyReturn * monthsPaid);
+                            
+                            // If amount wasn't provided, use calculated value
+                            if (!amount) {
+                                depositData.amount = calculatedAmount;
+                            }
                         }
                     }
                     
