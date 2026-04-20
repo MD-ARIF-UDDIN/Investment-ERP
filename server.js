@@ -13,7 +13,7 @@ connectDB().then(() => {
 
 const app = express();
 
-// Middleware
+// Middlewares
 app.use(cors({
     origin: ['http://localhost:5173', 'http://localhost:5174', 'https://robiul-vai.vercel.app', 'https://investment-erp.onrender.com', 'https://erp-i.vercel.app'],
     credentials: true
