@@ -4,7 +4,7 @@ const withdrawalSchema = new mongoose.Schema({
     member: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Member',
-        required: function () { return this.type === 'Normal' || this.type === 'Profit' || this.type === 'Project Investment'; }
+        required: function () { return this.type === 'Normal' || this.type === 'Profit'; }
     },
     project: {
         type: mongoose.Schema.Types.ObjectId,
