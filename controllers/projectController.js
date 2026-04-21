@@ -39,24 +39,22 @@ const getProjects = async (req, res) => {
             const depositReceived = relatedDeposits.reduce((acc, d) => acc + d.amount, 0);
             const totalReceived = legacyReceived + depositReceived;
 
-            // NEW: Calculate Due Amount based on return logic
+            // MODIFIED: Calculate Due Amount based on elapsed time
             const now = new Date();
             const start = new Date(p.startDate);
-            let monthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()) + 1;
+            const refDate = (p.status === 'Completed' || p.status === 'Cancelled') && p.endDate ? new Date(p.endDate) : now;
+            
+            // Calculate months passed (rounding down to nearest full month)
+            // If they want daily precision, we could change this, but monthly is standard.
+            let monthsPassed = (refDate.getFullYear() - start.getFullYear()) * 12 + (refDate.getMonth() - start.getMonth());
+            
+            // Boundary checks
             monthsPassed = Math.max(0, Math.min(monthsPassed, p.returnMonths || 1));
-
-            const fullCapitalPaid = totalReceived >= totalInvested;
-            const wasCapitalPaidEarly = fullCapitalPaid && monthsPassed <= 2;
 
             const totalProfitExpected = (totalInvested * (p.returnPercentage || 0)) / 100;
             const monthlyRate = totalProfitExpected / (p.returnMonths || 1);
 
-            let expectedToDate = 0;
-            if (wasCapitalPaidEarly) {
-                expectedToDate = totalProfitExpected;
-            } else {
-                expectedToDate = monthsPassed * monthlyRate;
-            }
+            const expectedToDate = monthsPassed * monthlyRate;
 
             const profitPaid = Math.max(0, totalReceived - totalInvested);
             const dueAmount = Math.max(0, Math.round(expectedToDate - profitPaid));
