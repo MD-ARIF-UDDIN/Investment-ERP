@@ -209,6 +209,7 @@ const updateProject = async (req, res) => {
         }
 
         project.name = req.body.name || project.name;
+        project.totalInvestment = req.body.totalInvestment !== undefined ? Number(req.body.totalInvestment) : project.totalInvestment;
         project.startDate = req.body.startDate || project.startDate;
         project.endDate = req.body.endDate || project.endDate;
         project.status = req.body.status || project.status;
@@ -224,6 +225,12 @@ const updateProject = async (req, res) => {
         if (req.file) {
             project.image = `/uploads/projects/${req.file.filename}`;
         }
+
+        // Recalculate currentProfit based on updated totalInvestment
+        const projectDeposits = await Deposit.find({ project: project._id, depositFor: 'Project' });
+        const totalReceivedDeposits = projectDeposits.reduce((acc, d) => acc + d.amount, 0);
+        const totalLegacy = project.paymentsReceived?.reduce((acc, curr) => acc + curr.amount, 0) || 0;
+        project.currentProfit = (totalReceivedDeposits + totalLegacy) - project.totalInvestment;
 
         project.updatedBy = req.user._id;
 
